@@ -1,0 +1,588 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>长方体智能拼接系统</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Roboto+Mono:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            /* 科技感配色 - 深空蓝/青/荧光绿 */
+            --tech-bg-main: #050b14;
+            --tech-panel-bg: rgba(20, 30, 48, 0.6);
+            --tech-card-bg: #0f1724;
+            --tech-border: rgba(0, 243, 255, 0.2);
+            
+            --tech-primary: #00f3ff; /* 核心青色 */
+            --tech-primary-glow: rgba(0, 243, 255, 0.4);
+            
+            --tech-success: #00ff9d; /* 最优解绿色 */
+            --tech-success-glow: rgba(0, 255, 157, 0.4);
+
+            --tech-text-bright: #e0f7fa;
+            --tech-text-dim: #607d8b;
+        }
+
+        body {
+            font-family: "PingFang SC", "Microsoft YaHei", "Helvetica Neue", Helvetica, Arial, sans-serif;
+            background-color: var(--tech-bg-main);
+            /* 增加全息网格背景 */
+            background-image: 
+                linear-gradient(rgba(0, 243, 255, 0.03) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(0, 243, 255, 0.03) 1px, transparent 1px);
+            background-size: 50px 50px;
+            color: var(--tech-text-bright);
+            margin: 0;
+            padding: 40px 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+        }
+
+        /* 标题样式 */
+        h1 {
+            color: var(--tech-text-bright);
+            margin-bottom: 30px;
+            font-weight: 800;
+            letter-spacing: 1px;
+            background: linear-gradient(90deg, #fff, var(--tech-primary));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            text-transform: uppercase;
+            text-shadow: 0 0 20px rgba(0, 243, 255, 0.3);
+        }
+
+        h1::before {
+             content: '◈';
+             font-size: 0.8em;
+             color: var(--tech-primary);
+        }
+
+        /* 控制台区域 */
+        .controls {
+            background: var(--tech-panel-bg);
+            backdrop-filter: blur(12px);
+            padding: 25px 40px;
+            border-radius: 4px;
+            border: 1px solid var(--tech-border);
+            border-left: 4px solid var(--tech-primary);
+            display: flex;
+            gap: 25px;
+            align-items: center;
+            margin-bottom: 40px;
+            flex-wrap: wrap;
+            justify-content: center;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+            position: relative;
+        }
+
+        /* 装饰角标 */
+        .controls::after {
+            content: 'SYSTEM READY';
+            position: absolute;
+            top: 5px;
+            right: 10px;
+            font-size: 9px;
+            color: var(--tech-text-dim);
+            font-family: 'Roboto Mono', monospace;
+            letter-spacing: 1px;
+        }
+
+        .input-group {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            color: var(--tech-text-bright);
+            font-weight: 500;
+            font-size: 1rem;
+        }
+
+        label { color: var(--tech-primary); font-weight: bold; }
+
+        input[type="number"] {
+            background: rgba(0, 0, 0, 0.4);
+            padding: 10px 15px;
+            border: 1px solid var(--tech-border);
+            border-radius: 2px;
+            font-size: 18px;
+            width: 100px;
+            color: #fff;
+            font-family: 'Roboto Mono', monospace;
+            text-align: center;
+            transition: all 0.3s;
+        }
+        input[type="number"]:focus {
+            outline: none;
+            border-color: var(--tech-primary);
+            box-shadow: 0 0 15px var(--tech-primary-glow);
+        }
+
+        button {
+            background: rgba(0, 243, 255, 0.1);
+            color: var(--tech-primary);
+            border: 1px solid var(--tech-primary);
+            padding: 12px 30px;
+            border-radius: 2px;
+            font-size: 15px;
+            cursor: pointer;
+            font-weight: 600;
+            letter-spacing: 1px;
+            transition: all 0.3s;
+            text-transform: uppercase;
+        }
+
+        button:hover {
+            background: var(--tech-primary);
+            color: #000;
+            box-shadow: 0 0 20px var(--tech-primary-glow);
+            transform: translateY(-1px);
+        }
+
+        /* 最优解数据面板 - 核心风格 */
+        #best-solution-panel {
+            background: linear-gradient(180deg, rgba(0, 255, 157, 0.08) 0%, rgba(15, 23, 36, 0.9) 100%);
+            border: 1px solid var(--tech-success);
+            box-shadow: 0 0 40px -10px rgba(0, 255, 157, 0.3), inset 0 0 20px rgba(0, 255, 157, 0.05);
+            width: 100%;
+            max-width: 850px;
+            border-radius: 6px;
+            padding: 35px;
+            margin-bottom: 50px;
+            display: none; /* 初始隐藏 */
+            flex-direction: column;
+            align-items: center;
+            text-align: center;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        /* 扫描线动画 */
+        #best-solution-panel::before {
+            content: '';
+            position: absolute;
+            top: 0; left: 0; right: 0; height: 1px;
+            background: var(--tech-success);
+            opacity: 0.5;
+            animation: scan 4s ease-in-out infinite;
+        }
+        @keyframes scan { 0% { top: 0; opacity:0; } 50% { opacity: 1; } 100% { top: 100%; opacity: 0; } }
+
+        .best-title {
+            font-size: 1.1rem;
+            font-weight: bold;
+            color: var(--tech-success);
+            letter-spacing: 2px;
+            margin-bottom: 10px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .best-value {
+            font-family: 'Roboto Mono', monospace;
+            font-size: 3.5rem;
+            font-weight: 700;
+            margin: 10px 0 30px 0;
+            color: #fff;
+            text-shadow: 0 0 20px var(--tech-success-glow);
+        }
+
+        .best-details {
+            display: flex;
+            gap: 20px;
+            width: 100%;
+            justify-content: center;
+        }
+
+        .best-detail-item {
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid rgba(0, 255, 157, 0.2);
+            padding: 15px 30px;
+            border-radius: 4px;
+            flex: 1;
+            max-width: 200px;
+        }
+
+        .best-detail-label { 
+            display: block; font-size: 0.8rem; color: var(--tech-text-dim); margin-bottom: 6px;
+        }
+        .best-detail-data { 
+            display: block; font-family: 'Roboto Mono', monospace; font-size: 1.3rem; font-weight: 600; color: var(--tech-success);
+        }
+
+        /* 结果列表网格 */
+        #results-container {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(360px, 1fr));
+            gap: 30px;
+            width: 100%;
+            max-width: 1400px;
+        }
+
+        /* 单个结果卡片 */
+        .result-card {
+            background: var(--tech-card-bg);
+            border: 1px solid rgba(255,255,255,0.08);
+            border-radius: 4px;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            transition: all 0.3s ease;
+            position: relative;
+        }
+
+        .result-card:hover {
+            transform: translateY(-5px);
+            border-color: var(--tech-primary);
+            box-shadow: 0 10px 40px -10px rgba(0, 243, 255, 0.2);
+        }
+
+        .card-header {
+            padding: 15px 20px;
+            background: rgba(255,255,255,0.03);
+            border-bottom: 1px solid rgba(255,255,255,0.05);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .card-header h3 { 
+            margin: 0; font-size: 16px; color: var(--tech-primary); font-weight: bold; letter-spacing: 1px;
+        }
+        
+        .badge-best {
+            background-color: rgba(0, 255, 157, 0.1);
+            color: var(--tech-success);
+            font-size: 12px;
+            padding: 4px 8px;
+            border-radius: 2px;
+            font-weight: bold;
+            border: 1px solid var(--tech-success);
+            box-shadow: 0 0 8px var(--tech-success-glow);
+        }
+
+        .card-info {
+            padding: 20px;
+            font-size: 14px;
+            color: var(--tech-text-dim);
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+        }
+
+        .info-item { display: flex; flex-direction: column; }
+        .info-label { font-size: 12px; color: var(--tech-text-dim); margin-bottom: 4px;}
+        .info-value { 
+            font-weight: 600; font-size: 16px; color: var(--tech-text-bright); font-family: 'Roboto Mono', monospace;
+        }
+
+        .canvas-container {
+            width: 100%;
+            height: 260px;
+            background: rgba(0,0,0,0.2); 
+            position: relative;
+            border-top: 1px solid rgba(255,255,255,0.05);
+        }
+        
+        .loading-text {
+            position: absolute;
+            top: 50%; left: 50%;
+            transform: translate(-50%, -50%);
+            color: var(--tech-primary);
+            font-size: 12px;
+            letter-spacing: 1px;
+        }
+
+        .unit-note {
+            margin-bottom: 25px;
+            font-size: 0.9em;
+            color: var(--tech-text-dim);
+            background: rgba(0, 243, 255, 0.05);
+            border: 1px solid var(--tech-border);
+            padding: 8px 16px;
+            border-radius: 4px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .unit-note strong { color: var(--tech-primary); }
+
+        /* 移动端适配 */
+        @media (max-width: 600px) {
+            .best-details { flex-direction: column; }
+            .best-detail-item { max-width: none; }
+            .best-value { font-size: 2.5rem; }
+            .controls { padding: 20px; }
+        }
+    </style>
+</head>
+<body>
+
+    <h1>长方体智能拼接系统</h1>
+    
+    <div class="controls">
+        <div class="input-group">
+            <label for="countInput">单元总数 (N):</label>
+            <input type="number" id="countInput" value="4" min="1" max="200">
+        </div>
+        <button onclick="generateLayouts()">执行运算 & 生成模型</button>
+    </div>
+
+    <div id="best-solution-panel">
+        <div class="best-title">▲ 最优拓扑结构 // 最小表面积</div>
+        <div class="best-value" id="best-area-display">0 cm²</div>
+        <div class="best-details">
+            <div class="best-detail-item">
+                <span class="best-detail-label">总长度 (L)</span>
+                <span class="best-detail-data" id="best-l-display">0 cm</span>
+            </div>
+            <div class="best-detail-item">
+                <span class="best-detail-label">总宽度 (W)</span>
+                <span class="best-detail-data" id="best-w-display">0 cm</span>
+            </div>
+            <div class="best-detail-item">
+                <span class="best-detail-label">总高度 (H)</span>
+                <span class="best-detail-data" id="best-h-display">0 cm</span>
+            </div>
+        </div>
+    </div>
+
+    <div class="unit-note">
+        <span>●</span>
+        <span><strong>基础单元参数：</strong> 长 12cm × 宽 9cm × 高 3cm</span>
+    </div>
+
+    <div id="results-container">
+        </div>
+
+    <script>
+        // 单个小长方体的尺寸
+        const UNIT_L = 12;
+        const UNIT_W = 9;
+        const UNIT_H = 3;
+
+        function generateLayouts() {
+            const n = parseInt(document.getElementById('countInput').value);
+            const container = document.getElementById('results-container');
+            const bestPanel = document.getElementById('best-solution-panel');
+            
+            if (isNaN(n) || n < 1) {
+                alert("输入错误：请输入有效的正整数。");
+                return;
+            }
+            if (n > 500) {
+                if(!confirm("警告：由于数量较大，可能会导致页面渲染卡顿。确认继续吗？")) return;
+            }
+
+            container.innerHTML = ''; // 清空列表
+            bestPanel.style.display = 'none'; // 先隐藏最优面板
+
+            const layouts = [];
+            let minArea = Infinity;
+            let bestData = null;
+
+            // 1. 寻找组合并计算
+            for (let x = 1; x <= n; x++) {
+                if (n % x === 0) {
+                    let remainder1 = n / x;
+                    for (let y = 1; y <= remainder1; y++) {
+                        if (remainder1 % y === 0) {
+                            let z = remainder1 / y;
+                            
+                            // 计算当前组合的数据
+                            const totalL = x * UNIT_L;
+                            const totalW = y * UNIT_W;
+                            const totalH = z * UNIT_H;
+                            const area = 2 * ((totalL * totalW) + (totalL * totalH) + (totalW * totalH));
+
+                            const layoutData = { x, y, z, totalL, totalW, totalH, area };
+                            layouts.push(layoutData);
+
+                            // 检查是否为最小值
+                            if (area < minArea) {
+                                minArea = area;
+                                bestData = layoutData;
+                            }
+                        }
+                    }
+                }
+            }
+
+            if (layouts.length === 0) {
+                container.innerHTML = '<p style="grid-column: 1/-1; text-align:center; color: var(--tech-text-dim);">未找到有效的拼接方案。</p>';
+                return;
+            }
+
+            // 2. 更新最优解面板显示
+            if (bestData) {
+                document.getElementById('best-area-display').textContent = `${bestData.area.toLocaleString()} cm²`;
+                document.getElementById('best-l-display').textContent = `${bestData.totalL} cm`;
+                document.getElementById('best-w-display').textContent = `${bestData.totalW} cm`;
+                document.getElementById('best-h-display').textContent = `${bestData.totalH} cm`;
+                bestPanel.style.display = 'flex'; // 显示面板
+            }
+
+            // 3. 生成所有卡片
+            layouts.forEach((layout, index) => {
+                // 标记是否是最小面积之一
+                const isBest = (layout.area === minArea);
+                createResultCard(layout, index, container, isBest);
+            });
+        }
+
+        function createResultCard(layout, index, container, isBest) {
+            const { x, y, z, totalL, totalW, totalH, area } = layout;
+            
+            const card = document.createElement('div');
+            card.className = 'result-card';
+            
+            // 如果是最优解，添加标记
+            const badgeHtml = isBest ? `<span class="badge-best">表面积最小</span>` : '';
+
+            // 根据是否是最优解，调整面积的显示颜色样式
+            const areaValueStyle = isBest 
+                ? 'color: var(--tech-success); text-shadow: 0 0 10px var(--tech-success-glow);' 
+                : '';
+
+            const htmlContent = `
+                <div class="card-header">
+                    <h3>方案编号: #${String(index + 1).padStart(2, '0')}</h3>
+                    ${badgeHtml}
+                </div>
+                <div class="card-info">
+                    <div class="info-item">
+                        <span class="info-label">堆叠矩阵 (长×宽×高)</span>
+                        <span class="info-value">${x} × ${y} × ${z}</span>
+                    </div>
+                    <div class="info-item">
+                        <span class="info-label">总表面积</span>
+                        <span class="info-value" style="${areaValueStyle}">${area.toLocaleString()} cm²</span>
+                    </div>
+                    <div class="info-item" style="grid-column: 1 / -1; margin-top: 5px; border-top: 1px solid rgba(255,255,255,0.05); padding-top: 15px;">
+                        <span class="info-label">整体物理尺寸 (cm)</span>
+                        <span class="info-value" style="color: var(--tech-primary);">${totalL} (长) × ${totalW} (宽) × ${totalH} (高)</span>
+                    </div>
+                </div>
+                <div class="canvas-container" id="canvas-box-${index}">
+                    <span class="loading-text">模型渲染中...</span>
+                </div>
+            `;
+            
+            card.innerHTML = htmlContent;
+            container.appendChild(card);
+
+            // 延迟渲染3D，防止卡顿
+            setTimeout(() => {
+                init3D(document.getElementById(`canvas-box-${index}`), x, y, z);
+            }, 50 * index);
+        }
+
+        function init3D(domElement, countX, countY, countZ) {
+            domElement.innerHTML = ''; 
+
+            const scene = new THREE.Scene();
+            // 3D背景透明，透出容器颜色
+            scene.background = null; 
+
+            const width = domElement.clientWidth;
+            const height = domElement.clientHeight;
+            const camera = new THREE.PerspectiveCamera(45, width / height, 0.1, 10000);
+
+            const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+            renderer.setSize(width, height);
+            domElement.appendChild(renderer.domElement);
+
+            const controls = new THREE.OrbitControls(camera, renderer.domElement);
+            controls.enableDamping = true;
+            controls.autoRotate = true; // 开启自动旋转
+            controls.autoRotateSpeed = 1.0;
+
+            // 几何体定义
+            const geometry = new THREE.BoxGeometry(UNIT_L, UNIT_H, UNIT_W); 
+            
+            // 材质 - 半透明全息风格
+            const material = new THREE.MeshPhongMaterial({ 
+                color: 0x00f3ff,  // 青色主体
+                emissive: 0x002233, // 微弱自发光
+                transparent: true, 
+                opacity: 0.6,
+                flatShading: false,
+                shininess: 80
+            });
+            
+            // 边框线 - 亮白色
+            const edgeMaterial = new THREE.LineBasicMaterial({ color: 0xffffff, linewidth: 1, opacity: 0.4, transparent: true });
+            const edgesGeo = new THREE.EdgesGeometry(geometry);
+
+            const group = new THREE.Group();
+
+            const offsetX = (countX * UNIT_L) / 2;
+            const offsetY = (countZ * UNIT_H) / 2; 
+            const offsetZ = (countY * UNIT_W) / 2; 
+
+            for (let i = 0; i < countX; i++) {
+                for (let j = 0; j < countY; j++) {
+                    for (let k = 0; k < countZ; k++) {
+                        // 缩小一点点方块尺寸，让线框更明显，产生"模块化"感觉
+                        const cube = new THREE.Mesh(
+                            new THREE.BoxGeometry(UNIT_L - 0.2, UNIT_H - 0.2, UNIT_W - 0.2), 
+                            material
+                        );
+                        const edges = new THREE.LineSegments(edgesGeo, edgeMaterial);
+
+                        const posX = (i * UNIT_L) + (UNIT_L / 2) - offsetX;
+                        const posY = (k * UNIT_H) + (UNIT_H / 2) - offsetY;
+                        const posZ = (j * UNIT_W) + (UNIT_W / 2) - offsetZ;
+
+                        cube.position.set(posX, posY, posZ);
+                        edges.position.set(posX, posY, posZ);
+
+                        group.add(cube);
+                        group.add(edges);
+                    }
+                }
+            }
+
+            scene.add(group);
+
+            // 灯光设置
+            const ambientLight = new THREE.AmbientLight(0xffffff, 0.4);
+            scene.add(ambientLight);
+            
+            // 主光源 (冷色调)
+            const dirLight = new THREE.DirectionalLight(0x00f3ff, 1);
+            dirLight.position.set(100, 200, 100);
+            scene.add(dirLight);
+            
+            // 辅助光源 (互补色，增加立体感)
+            const pointLight = new THREE.PointLight(0xaa00ff, 0.6);
+            pointLight.position.set(-100, -100, -100);
+            scene.add(pointLight);
+
+            // 自动调整相机
+            const boundingBox = new THREE.Box3().setFromObject(group);
+            const size = boundingBox.getSize(new THREE.Vector3());
+            const maxDim = Math.max(size.x, size.y, size.z);
+            
+            camera.position.set(maxDim * 1.5, maxDim * 1.6, maxDim * 1.5);
+            camera.lookAt(0, 0, 0);
+            controls.update();
+
+            function animate() {
+                requestAnimationFrame(animate);
+                controls.update(); // 必须更新以支持阻尼和自动旋转
+                renderer.render(scene, camera);
+            }
+            animate();
+        }
+
+        window.onload = generateLayouts;
+    </script>
+</body>
+</html>
